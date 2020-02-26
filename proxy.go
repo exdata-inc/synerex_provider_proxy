@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"google.golang.org/grpc"
+	"io"
 	"log"
 	"net"
 
@@ -62,9 +63,23 @@ func (p proxyInfo) Confirm(ctx context.Context, target *api.Target) (*api.Respon
 func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_SubscribeDemandServer) error {
 	ctx := context.Background()
 	dmc, err := sclient.Client.SubscribeDemand(ctx, ch)
-	dm, derr := dmc.Recv()
 
-	if derr != nil {
+	if err != nil {
+		log.Printf("SubscribeDemand Error %v", err)
+		return err
+	}
+
+	for {
+		var dm *api.Demand
+		dm, err = dmc.Recv() // receive Demand
+		if err != nil {
+			if err == io.EOF {
+				log.Print("End Demand subscribe OK")
+			} else {
+				log.Printf("SXServiceClient SubscribeDemand error [%v]", err)
+			}
+			break
+		}
 		stream.Send(dm)
 	}
 
@@ -74,9 +89,23 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_SubscribeSupplyServer) error {
 	ctx := context.Background()
 	spc, err := sclient.Client.SubscribeSupply(ctx, ch)
-	sp, serr := spc.Recv()
 
-	if serr != nil {
+	if err != nil {
+		log.Printf("SubscribeSupply Error %v", err)
+		return err
+	}
+
+	for {
+		var sp *api.Supply
+		sp, err = spc.Recv() // receive Demand
+		if err != nil {
+			if err == io.EOF {
+				log.Print("End Supply subscribe OK")
+			} else {
+				log.Printf("SXServiceClient SubscribeSupply error [%v]", err)
+			}
+			break
+		}
 		stream.Send(sp)
 	}
 
@@ -86,10 +115,24 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusServer) error {
 	ctx := context.Background()
 	mbc, err := sclient.Client.SubscribeMbus(ctx, mb)
-	ob, merr := mbc.Recv()
 
-	if merr != nil {
-		stream.Send(ob)
+	if err != nil {
+		log.Printf("SubscribeMbus Error %v", err)
+		return err
+	}
+
+	for {
+		var mes *api.MbusMsg
+		mes, err = mbc.Recv() // receive Demand
+		if err != nil {
+			if err == io.EOF {
+				log.Print("End Mbus subscribe OK")
+			} else {
+				log.Printf("SXServiceClient SubscribeMbus error [%v]", err)
+			}
+			break
+		}
+		stream.Send(mes)
 	}
 
 	return err
