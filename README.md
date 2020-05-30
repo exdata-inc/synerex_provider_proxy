@@ -1,8 +1,12 @@
 # provider_proxy
-proxy for multi languages provider
+Proxy Server for Synerex, mainly for non-go languages.
+
+By using proxy server, other languages may not consider about node server commands.
 
 # start
 
-run proxy on localhost before run provider
+Run proxy on localhost before run provider
 
-./proxy.exe
+./proxy
+
+

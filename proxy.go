@@ -219,7 +219,7 @@ func main() {
 
 	s := newProxyInfo()
 	grpcServer := prepareGrpcServer(s, opts...)
-	log.Printf("Start Synerex Server, connection waiting at port :%d ...", *port)
+	log.Printf("Start Synerex Proxy Server, connection waiting at port :%d ...", *port)
 	serr := grpcServer.Serve(lis)
 	log.Printf("Should not arrive here.. server closed. %v", serr)
 
