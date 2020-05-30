@@ -4,10 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"net"
+
+	"google.golang.org/grpc"
 
 	api "github.com/synerex/synerex_api"
 	nodeapi "github.com/synerex/synerex_nodeapi"
@@ -16,16 +17,16 @@ import (
 )
 
 var (
-	port     = flag.Int("port", 18000, "The Proxy Listening Port")
+	port            = flag.Int("port", 18000, "The Proxy Listening Port")
 	nodesrv         = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
 	cluster_id      = flag.Int("cluster_id", 0, "ClusterId for The Synerex Server")
 	channel         = flag.Int("channel", 1, "Channel")
 	name            = flag.String("name", "Proxy", "Provider Name")
 	sxServerAddress string
-	sclient		*sxutil.SXServiceClient
+	sclient         *sxutil.SXServiceClient
 )
 
-func init(){
+func init() {
 	sclient = nil
 }
 
@@ -200,6 +201,8 @@ func providerInit(command nodeapi.KeepAliveCommand, ret string) {
 }
 
 func main() {
+	log.Printf("ProxyProvider(%s) built %s sha1 %s", sxutil.GitVer, sxutil.BuildTime, sxutil.Sha1Ver)
+
 	flag.Parse()
 	go sxutil.HandleSigInt()
 	sxutil.RegisterDeferFunction(sxutil.UnRegisterNode)
@@ -223,4 +226,3 @@ func main() {
 	sxutil.CallDeferFunctions() // cleanup!
 
 }
-
