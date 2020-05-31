@@ -7,12 +7,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"path"
 
 	"google.golang.org/grpc"
 
 	api "github.com/synerex/synerex_api"
 	nodeapi "github.com/synerex/synerex_nodeapi"
-	pbase "github.com/synerex/synerex_proto"
 	sxutil "github.com/synerex/synerex_sxutil"
 )
 
@@ -174,8 +174,26 @@ func newProxyInfo() *proxyInfo {
 	return s
 }
 
+func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	resp, err = handler(ctx, req)
+	log.Printf("%v -> %v", req, resp)
+	return
+}
+
+func StreamServerInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	err := handler(srv, stream)
+	method := path.Base(info.FullMethod)
+	log.Printf("stream %s %v", method, err)
+	return err
+}
+
 func prepareGrpcServer(pi *proxyInfo, opts ...grpc.ServerOption) *grpc.Server {
-	server := grpc.NewServer(opts...)
+	// we'd like to log the connection
+
+	uIntOpt := grpc.UnaryInterceptor(UnaryServerInterceptor)
+	sIntOpt := grpc.StreamInterceptor(StreamServerInterceptor)
+
+	server := grpc.NewServer(uIntOpt, sIntOpt)
 	api.RegisterSynerexServer(server, pi)
 	return server
 }
@@ -187,8 +205,10 @@ func providerInit(command nodeapi.KeepAliveCommand, ret string) {
 		ClusterId: int32(*cluster_id),
 		AreaId:    "Default",
 	}
+	// set provider name with channel
+	sname := fmt.Sprintf("%s:%d", *name, *channel)
 	// obtain synerex server address from nodeserv
-	srv, err := sxutil.RegisterNodeWithCmd(*nodesrv, *name, channelTypes, sxo, providerInit)
+	srv, err := sxutil.RegisterNodeWithCmd(*nodesrv, sname, channelTypes, sxo, providerInit)
 	if err != nil {
 		log.Fatal("Can't register node...")
 	}
@@ -196,8 +216,8 @@ func providerInit(command nodeapi.KeepAliveCommand, ret string) {
 
 	sxServerAddress = srv
 	client := sxutil.GrpcConnectServer(srv)
-	argJson := fmt.Sprintf("{Client:Simple}")
-	sclient = sxutil.NewSXServiceClient(client, pbase.RIDE_SHARE, argJson)
+	argJson := fmt.Sprintf("{Proxy:%d}", *channel)
+	sclient = sxutil.NewSXServiceClient(client, uint32(*channel), argJson)
 }
 
 func main() {
@@ -219,7 +239,7 @@ func main() {
 
 	s := newProxyInfo()
 	grpcServer := prepareGrpcServer(s, opts...)
-	log.Printf("Start Synerex Proxy Server, connection waiting at port :%d ...", *port)
+	log.Printf("Start Synerex Proxy Server[%s:%d], connection waiting at port :%d ...", *name, *channel, *port)
 	serr := grpcServer.Serve(lis)
 	log.Printf("Should not arrive here.. server closed. %v", serr)
 
