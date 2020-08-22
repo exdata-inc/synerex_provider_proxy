@@ -64,6 +64,7 @@ func (p proxyInfo) Confirm(ctx context.Context, target *api.Target) (*api.Respon
 
 func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_SubscribeDemandServer) error {
 	ctx := context.Background()
+	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
 	dmc, err := sclient.Client.SubscribeDemand(ctx, ch)
 
 	if err != nil {
@@ -98,6 +99,7 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 
 func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_SubscribeSupplyServer) error {
 	ctx := context.Background()
+	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
 	spc, err := sclient.Client.SubscribeSupply(ctx, ch)
 
 	if err != nil {
