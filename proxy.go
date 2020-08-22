@@ -22,6 +22,7 @@ var (
 	cluster_id      = flag.Int("cluster_id", 0, "ClusterId for The Synerex Server")
 	channel         = flag.Int("channel", 1, "Channel")
 	name            = flag.String("name", "Proxy", "Provider Name")
+	verbose         = flag.Bool("verbose", false, "Verbose message flag")
 	sxServerAddress string
 	sclient         *sxutil.SXServiceClient
 )
@@ -81,7 +82,15 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 			}
 			break
 		}
-		stream.Send(dm)
+		if *verbose {
+			log.Printf("Demand:%d:%v", ch.ChannelType, dm)
+		}
+
+		err = stream.Send(dm)
+		if err != nil {
+			log.Printf("Send Demand Error %v", err)
+			break
+		}
 	}
 
 	return err
@@ -109,7 +118,15 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			}
 			break
 		}
-		stream.Send(sp)
+		//
+		if *verbose {
+			log.Printf("Supply:%d:%v", ch.ChannelType, sp)
+		}
+		err = stream.Send(sp)
+		if err != nil {
+			log.Printf("Send Supply Error %v", err)
+			break
+		}
 	}
 
 	return err
@@ -143,6 +160,11 @@ func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusS
 			}
 			break
 		}
+		//
+		if *verbose {
+			log.Printf("MBus:%v", mes)
+		}
+
 		stream.Send(mes)
 	}
 
