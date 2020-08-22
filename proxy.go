@@ -94,6 +94,8 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	if err != nil {
 		log.Printf("SubscribeSupply Error %v", err)
 		return err
+	} else {
+		log.Printf("SubscribeSupply OK %v", ch)
 	}
 
 	for {
@@ -111,6 +113,14 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	}
 
 	return err
+}
+
+func (p proxyInfo) CreateMbus(ctx context.Context, mbOpt *api.MbusOpt) (*api.Mbus, error) {
+	return sclient.Client.CreateMbus(ctx, mbOpt)
+}
+
+func (p proxyInfo) CloseMbus(ctx context.Context, mb *api.Mbus) (*api.Response, error) {
+	return sclient.Client.CloseMbus(ctx, mb)
 }
 
 func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusServer) error {
@@ -139,12 +149,12 @@ func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusS
 	return err
 }
 
-func (p proxyInfo) SendMsg(ctx context.Context, mb *api.MbusMsg) (*api.Response, error) {
-	return sclient.Client.SendMsg(ctx, mb)
+func (p proxyInfo) SendMbusMsg(ctx context.Context, mb *api.MbusMsg) (*api.Response, error) {
+	return sclient.Client.SendMbusMsg(ctx, mb)
 }
 
-func (p proxyInfo) CloseMbus(ctx context.Context, mb *api.Mbus) (*api.Response, error) {
-	return sclient.Client.CloseMbus(ctx, mb)
+func (p proxyInfo) GetMbusState(ctx context.Context, mb *api.Mbus) (*api.MbusState, error) {
+	return sclient.Client.GetMbusState(ctx, mb)
 }
 
 func (p proxyInfo) SubscribeGateway(*api.GatewayInfo, api.Synerex_SubscribeGatewayServer) error {
@@ -237,8 +247,8 @@ func main() {
 
 	var opts []grpc.ServerOption
 
-	s := newProxyInfo()
-	grpcServer := prepareGrpcServer(s, opts...)
+	proxyInfo := newProxyInfo()
+	grpcServer := prepareGrpcServer(proxyInfo, opts...)
 	log.Printf("Start Synerex Proxy Server[%s:%d], connection waiting at port :%d ...", *name, *channel, *port)
 	serr := grpcServer.Serve(lis)
 	log.Printf("Should not arrive here.. server closed. %v", serr)
