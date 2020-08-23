@@ -125,7 +125,7 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 			dmu.Lock()
 			chans := demandChs[ch.ChannelType]
 			for i := range chans {
-				if chans[i] == supCh {
+				if chans[i] == demCh {
 					err = stream.Send(dm)
 					if err != nil {
 						log.Printf("Send Demand Error %v", err)
@@ -171,10 +171,10 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
 
 	smu.Lock()
-	if len(supplyChs[ch.ChannelType]) == 0 { // if there is no subscriber.
-		supCh := make(chan *api.Supply, MessageChannelBufferSize)
-		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
-		smu.Unlock()
+	supCh := make(chan *api.Supply, MessageChannelBufferSize)
+	supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
+	smu.Unlock()
+	if len(supplyChs[ch.ChannelType]) == 1 { // if there is no subscriber.
 		spc, err := sclient.Client.SubscribeSupply(ctx, ch)
 		if err != nil {
 			log.Printf("SubscribeSupply Error %v", err)
@@ -223,10 +223,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 		}
 		return err
 	} else {
-		log.Printf("No %d SubscribeSupply OK %v", len(supplyChs[ch.ChannelType])+1, ch)
-		supCh := make(chan *api.Supply, MessageChannelBufferSize)
-		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
-		smu.Unlock()
+		log.Printf("No %d SubscribeSupply OK %v", len(supplyChs[ch.ChannelType]), ch)
 		var err error
 		for {
 			sp := <-supCh // receive Supply
@@ -304,10 +301,20 @@ func (p proxyInfo) CloseDemandChannel(ctx context.Context, ch *api.Channel) (*ap
 }
 
 func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*api.Response, error) {
-	return sclient.Client.CloseSupplyChannel(ctx, ch)
+	smu.Lock()
+	if len(supplyChs[ch.ChannelType]) > 0 {
+		log.Print("ClosingSupply %v", ch)
+		supplyChs[ch.ChannelType] = make([]chan *api.Supply, 0, 1)
+	}
+	smu.Unlock()
+	return &api.Response{Ok: true, Err: ""}, nil
+
+	//	return sclient.Client.CloseSupplyChannel(ctx, ch)
 }
 
 func (p proxyInfo) CloseAllChannels(ctx context.Context, id *api.ProviderID) (*api.Response, error) {
+	// special treatment for Proxy. We do not need to disconnect with server.
+
 	return sclient.Client.CloseAllChannels(ctx, id)
 }
 
