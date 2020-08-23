@@ -221,9 +221,11 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 				break
 			}
 		}
+		log.Printf("SubscribeSupply main closed: %v", ch)
 		return err
 	} else {
-		log.Printf("No %d SubscribeSupply OK %v", len(supplyChs[ch.ChannelType]), ch)
+		num := len(supplyChs[ch.ChannelType])
+		log.Printf("No %d SubscribeSupply OK %v", num, ch)
 		var err error
 		for {
 			sp := <-supCh // receive Supply
@@ -236,6 +238,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 				break
 			}
 		}
+		log.Printf("SubscribeSupply %d closed : %v", num, ch)
 		return err
 	}
 
