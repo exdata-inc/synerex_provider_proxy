@@ -307,12 +307,15 @@ func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*ap
 	smu.Lock()
 	if len(supplyChs[ch.ChannelType]) > 0 {
 		log.Print("ClosingSupply %v", ch)
+		for i := range supplyChs[ch.ChannelType] {
+			close(supplyChs[ch.ChannelType][i])
+		}
 		supplyChs[ch.ChannelType] = make([]chan *api.Supply, 0, 1)
 	}
 	smu.Unlock()
-	return &api.Response{Ok: true, Err: ""}, nil
+	//	return &api.Response{Ok: true, Err: ""}, nil
 
-	//	return sclient.Client.CloseSupplyChannel(ctx, ch)
+	return sclient.Client.CloseSupplyChannel(ctx, ch)
 }
 
 func (p proxyInfo) CloseAllChannels(ctx context.Context, id *api.ProviderID) (*api.Response, error) {
