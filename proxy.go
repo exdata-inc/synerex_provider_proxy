@@ -92,36 +92,78 @@ func removeSupplyChannelFromSlice(sl []chan *api.Supply, c chan *api.Supply) []c
 func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_SubscribeDemandServer) error {
 	ctx := context.Background()
 	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
-	dmc, err := sclient.Client.SubscribeDemand(ctx, ch)
 
-	if err != nil {
-		log.Printf("SubscribeDemand Error %v", err)
+	dmu.Lock()
+	if len(demandChs[ch.ChannelType]) == 0 { // if there is no subscriber.
+		demCh := make(chan *api.Demand, MessageChannelBufferSize)
+		demandChs[ch.ChannelType] = append(demandChs[ch.ChannelType], demCh)
+		dmu.Unlock()
+		dmc, err := sclient.Client.SubscribeDemand(ctx, ch)
+		if err != nil {
+			log.Printf("SubscribeDemand Error %v", err)
+			dmu.Lock()
+			demandChs[ch.ChannelType] = removeDemandChannelFromSlice(demandChs[ch.ChannelType], demCh)
+			dmu.Unlock()
+			return err
+		} else {
+			log.Printf("SubscribeDemand OK %v", ch)
+		}
+		for {
+			var dm *api.Demand
+			dm, err = dmc.Recv() // receive Demand
+			if err != nil {
+				if err == io.EOF {
+					log.Print("End Demand subscribe OK")
+				} else {
+					log.Printf("SXServiceClient SubscribeDemand error [%v]", err)
+				}
+				break
+			}
+			if *verbose {
+				log.Printf("Demand:%d:%v", ch.ChannelType, dm)
+			}
+			dmu.Lock()
+			chans := demandChs[ch.ChannelType]
+			for i := range chans {
+				if chans[i] == supCh {
+					err = stream.Send(dm)
+					if err != nil {
+						log.Printf("Send Demand Error %v", err)
+						dmu.Lock()
+						demandChs[ch.ChannelType] = removeDemandChannelFromSlice(demandChs[ch.ChannelType], demCh)
+						dmu.Unlock()
+					}
+				} else {
+					chans[i] <- dm
+				}
+			}
+			dmu.Unlock()
+			if len(chans) == 0 { // if there is no receiver quit subscirption.
+				// we need to send "No subcriber to server"
+				err = dmc.CloseSend()
+				break
+			}
+		}
+		return err
+	} else {
+		log.Printf("No %d SubscribeDemand OK %v", len(demandChs[ch.ChannelType])+1, ch)
+		demCh := make(chan *api.Demand, MessageChannelBufferSize)
+		demandChs[ch.ChannelType] = append(demandChs[ch.ChannelType], demCh)
+		dmu.Unlock()
+		var err error
+		for {
+			dm := <-demCh // receive Supply
+			err = stream.Send(dm)
+			if err != nil {
+				log.Printf("Send Demand Error %v", err)
+				dmu.Lock()
+				demandChs[ch.ChannelType] = removeDemandChannelFromSlice(demandChs[ch.ChannelType], demCh)
+				dmu.Unlock()
+				break
+			}
+		}
 		return err
 	}
-
-	for {
-		var dm *api.Demand
-		dm, err = dmc.Recv() // receive Demand
-		if err != nil {
-			if err == io.EOF {
-				log.Print("End Demand subscribe OK")
-			} else {
-				log.Printf("SXServiceClient SubscribeDemand error [%v]", err)
-			}
-			break
-		}
-		if *verbose {
-			log.Printf("Demand:%d:%v", ch.ChannelType, dm)
-		}
-
-		err = stream.Send(dm)
-		if err != nil {
-			log.Printf("Send Demand Error %v", err)
-			break
-		}
-	}
-
-	return err
 }
 
 func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_SubscribeSupplyServer) error {
@@ -164,12 +206,20 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 					err = stream.Send(sp)
 					if err != nil {
 						log.Printf("Send Supply Error %v", err)
+						smu.Lock()
+						supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
+						smu.Unlock()
 					}
 				} else {
 					chans[i] <- sp
 				}
 			}
 			smu.Unlock()
+			if len(chans) == 0 { // if there is no receiver quit subscirption.
+				// we need to send "No subcriber to server"
+				err = spc.CloseSend()
+				break
+			}
 		}
 		return err
 	} else {
@@ -183,6 +233,9 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			err = stream.Send(sp)
 			if err != nil {
 				log.Printf("Send Supply Error %v", err)
+				smu.Lock()
+				supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
+				smu.Unlock()
 				break
 			}
 		}
