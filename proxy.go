@@ -173,6 +173,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 		}
 		return err
 	} else {
+		log.Printf("No %d SubscribeSupply OK %v", len(supplyChs[ch.ChannelType])+1, ch)
 		supCh := make(chan *api.Supply, MessageChannelBufferSize)
 		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
 		smu.Unlock()
