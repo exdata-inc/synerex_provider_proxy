@@ -226,7 +226,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	} else {
 		num := len(supplyChs[ch.ChannelType])
 		log.Printf("No %d SubscribeSupply OK %v", num, ch)
-		var err error
+		var err error = nil
 		for {
 			sp := <-supCh // receive Supply
 			if sp != nil {
@@ -239,7 +239,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 					break
 				}
 			} else {
-				log.Print("Channel %d closed", num)
+				log.Printf("Channel %d closed", num)
 				break
 			}
 		}
@@ -319,7 +319,7 @@ func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*ap
 	}
 	smu.Unlock()
 	//	return &api.Response{Ok: true, Err: ""}, nil
-
+	ch.ClientId = uint64(sclient.ClientID)
 	return sclient.Client.CloseSupplyChannel(ctx, ch)
 }
 
