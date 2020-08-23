@@ -229,12 +229,17 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 		var err error
 		for {
 			sp := <-supCh // receive Supply
-			err = stream.Send(sp)
-			if err != nil {
-				log.Printf("Send Supply Error %v", err)
-				smu.Lock()
-				supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
-				smu.Unlock()
+			if sp != nil {
+				err = stream.Send(sp)
+				if err != nil {
+					log.Printf("Send Supply Error %v", err)
+					smu.Lock()
+					supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
+					smu.Unlock()
+					break
+				}
+			} else {
+				log.Print("Channel %d closed", num)
 				break
 			}
 		}
@@ -306,7 +311,7 @@ func (p proxyInfo) CloseDemandChannel(ctx context.Context, ch *api.Channel) (*ap
 func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*api.Response, error) {
 	smu.Lock()
 	if len(supplyChs[ch.ChannelType]) > 0 {
-		log.Print("ClosingSupply %v", ch)
+		log.Printf("ClosingSupply %v", ch)
 		for i := range supplyChs[ch.ChannelType] {
 			close(supplyChs[ch.ChannelType][i])
 		}
