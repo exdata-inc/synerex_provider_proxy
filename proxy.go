@@ -8,28 +8,35 @@ import (
 	"log"
 	"net"
 	"path"
+	"sync"
 
 	"google.golang.org/grpc"
 
 	api "github.com/synerex/synerex_api"
 	nodeapi "github.com/synerex/synerex_nodeapi"
+	proto "github.com/synerex/synerex_proto"
 	sxutil "github.com/synerex/synerex_sxutil"
 )
 
 var (
 	port            = flag.Int("port", 18000, "The Proxy Listening Port")
 	nodesrv         = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
-	cluster_id      = flag.Int("cluster_id", 0, "ClusterId for The Synerex Server")
+	clusterId       = flag.Int("cluster_id", 0, "ClusterId for The Synerex Server")
 	channel         = flag.Int("channel", 1, "Channel")
 	name            = flag.String("name", "Proxy", "Provider Name")
 	verbose         = flag.Bool("verbose", false, "Verbose message flag")
 	sxServerAddress string
 	sclient         *sxutil.SXServiceClient
+	smu, dmu        sync.RWMutex
+	supplyChs       [proto.ChannelTypeMax][]chan *api.Supply
+	demandChs       [proto.ChannelTypeMax][]chan *api.Demand
 )
 
 func init() {
 	sclient = nil
 }
+
+const MessageChannelBufferSize = 100 // same as synerex-server.go : 30
 
 type proxyInfo struct {
 }
@@ -60,6 +67,26 @@ func (p proxyInfo) SelectDemand(ctx context.Context, target *api.Target) (*api.C
 
 func (p proxyInfo) Confirm(ctx context.Context, target *api.Target) (*api.Response, error) {
 	return sclient.Client.Confirm(ctx, target)
+}
+
+func removeDemandChannelFromSlice(sl []chan *api.Demand, c chan *api.Demand) []chan *api.Demand {
+	for i, ch := range sl {
+		if ch == c {
+			return append(sl[:i], sl[i+1:]...)
+		}
+	}
+	log.Printf("Cant find channel %v in removeChannel", c)
+	return sl
+}
+
+func removeSupplyChannelFromSlice(sl []chan *api.Supply, c chan *api.Supply) []chan *api.Supply {
+	for i, ch := range sl {
+		if ch == c {
+			return append(sl[:i], sl[i+1:]...)
+		}
+	}
+	log.Printf("Cant find channel %v in removeChannel", c)
+	return sl
 }
 
 func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_SubscribeDemandServer) error {
@@ -100,38 +127,67 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_SubscribeSupplyServer) error {
 	ctx := context.Background()
 	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
-	spc, err := sclient.Client.SubscribeSupply(ctx, ch)
 
-	if err != nil {
-		log.Printf("SubscribeSupply Error %v", err)
+	smu.Lock()
+	if len(supplyChs[ch.ChannelType]) == 0 { // if there is no subscriber.
+		supCh := make(chan *api.Supply, MessageChannelBufferSize)
+		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
+		smu.Unlock()
+		spc, err := sclient.Client.SubscribeSupply(ctx, ch)
+		if err != nil {
+			log.Printf("SubscribeSupply Error %v", err)
+			smu.Lock()
+			supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
+			smu.Unlock()
+			return err
+		} else {
+			log.Printf("SubscribeSupply OK %v", ch)
+		}
+		for {
+			var sp *api.Supply
+			sp, err = spc.Recv() // receive Demand
+			if err != nil {
+				if err == io.EOF {
+					log.Print("End Supply subscribe OK")
+				} else {
+					log.Printf("SXServiceClient SubscribeSupply error [%v]", err)
+				}
+				break
+			}
+			if *verbose {
+				log.Printf("Supply:%d:%v", ch.ChannelType, sp)
+			}
+			smu.Lock()
+			chans := supplyChs[ch.ChannelType]
+			for i := range chans {
+				if chans[i] == supCh {
+					err = stream.Send(sp)
+					if err != nil {
+						log.Printf("Send Supply Error %v", err)
+					}
+				} else {
+					chans[i] <- sp
+				}
+			}
+			smu.Unlock()
+		}
 		return err
 	} else {
-		log.Printf("SubscribeSupply OK %v", ch)
-	}
-
-	for {
-		var sp *api.Supply
-		sp, err = spc.Recv() // receive Demand
-		if err != nil {
-			if err == io.EOF {
-				log.Print("End Supply subscribe OK")
-			} else {
-				log.Printf("SXServiceClient SubscribeSupply error [%v]", err)
+		supCh := make(chan *api.Supply, MessageChannelBufferSize)
+		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
+		smu.Unlock()
+		var err error
+		for {
+			sp := <-supCh // receive Supply
+			err = stream.Send(sp)
+			if err != nil {
+				log.Printf("Send Supply Error %v", err)
+				break
 			}
-			break
 		}
-		//
-		if *verbose {
-			log.Printf("Supply:%d:%v", ch.ChannelType, sp)
-		}
-		err = stream.Send(sp)
-		if err != nil {
-			log.Printf("Send Supply Error %v", err)
-			break
-		}
+		return err
 	}
 
-	return err
 }
 
 func (p proxyInfo) CreateMbus(ctx context.Context, mbOpt *api.MbusOpt) (*api.Mbus, error) {
@@ -236,7 +292,7 @@ func providerInit(command nodeapi.KeepAliveCommand, ret string) {
 	channelTypes := []uint32{uint32(*channel)}
 	sxo := &sxutil.SxServerOpt{
 		NodeType:  nodeapi.NodeType_PROVIDER,
-		ClusterId: int32(*cluster_id),
+		ClusterId: int32(*clusterId),
 		AreaId:    "Default",
 	}
 	// set provider name with channel
