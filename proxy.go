@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/golang/protobuf/ptypes"
 	api "github.com/synerex/synerex_api"
 	nodeapi "github.com/synerex/synerex_nodeapi"
 	proto "github.com/synerex/synerex_proto"
@@ -42,10 +43,16 @@ type proxyInfo struct {
 }
 
 func (p proxyInfo) NotifyDemand(ctx context.Context, dm *api.Demand) (*api.Response, error) {
+	if dm.Ts == nil {
+		dm.Ts = ptypes.TimestampNow() // add timestamp
+	}
 	return sclient.Client.NotifyDemand(ctx, dm)
 }
 
 func (p proxyInfo) NotifySupply(ctx context.Context, sp *api.Supply) (*api.Response, error) {
+	if sp.Ts == nil {
+		sp.Ts = ptypes.TimestampNow() // add timestamp
+	}
 	return sclient.Client.NotifySupply(ctx, sp)
 }
 
