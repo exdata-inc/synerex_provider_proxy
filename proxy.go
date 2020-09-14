@@ -352,10 +352,15 @@ func StreamServerInterceptor(srv interface{}, stream grpc.ServerStream, info *gr
 func prepareGrpcServer(pi *proxyInfo, opts ...grpc.ServerOption) *grpc.Server {
 	// we'd like to log the connection
 
-	uIntOpt := grpc.UnaryInterceptor(UnaryServerInterceptor)
-	sIntOpt := grpc.StreamInterceptor(StreamServerInterceptor)
+	var server *grpc.Server
+	if *verbose {
+		uIntOpt := grpc.UnaryInterceptor(UnaryServerInterceptor)
+		sIntOpt := grpc.StreamInterceptor(StreamServerInterceptor)
+		server = grpc.NewServer(uIntOpt, sIntOpt)
+	} else {
+		server = grpc.NewServer()
+	}
 
-	server := grpc.NewServer(uIntOpt, sIntOpt)
 	api.RegisterSynerexServer(server, pi)
 	return server
 }
