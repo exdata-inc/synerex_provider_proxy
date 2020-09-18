@@ -42,31 +42,31 @@ type proxyInfo struct {
 }
 
 func (p proxyInfo) NotifyDemand(ctx context.Context, dm *api.Demand) (*api.Response, error) {
-	return sclient.Client.NotifyDemand(ctx, dm)
+	return sclient.SXClient.Client.NotifyDemand(ctx, dm)
 }
 
 func (p proxyInfo) NotifySupply(ctx context.Context, sp *api.Supply) (*api.Response, error) {
-	return sclient.Client.NotifySupply(ctx, sp)
+	return sclient.SXClient.Client.NotifySupply(ctx, sp)
 }
 
 func (p proxyInfo) ProposeDemand(ctx context.Context, dm *api.Demand) (*api.Response, error) {
-	return sclient.Client.ProposeDemand(ctx, dm)
+	return sclient.SXClient.Client.ProposeDemand(ctx, dm)
 }
 
 func (p proxyInfo) ProposeSupply(ctx context.Context, sp *api.Supply) (*api.Response, error) {
-	return sclient.Client.ProposeSupply(ctx, sp)
+	return sclient.SXClient.Client.ProposeSupply(ctx, sp)
 }
 
 func (p proxyInfo) SelectSupply(ctx context.Context, target *api.Target) (*api.ConfirmResponse, error) {
-	return sclient.Client.SelectSupply(ctx, target)
+	return sclient.SXClient.Client.SelectSupply(ctx, target)
 }
 
 func (p proxyInfo) SelectDemand(ctx context.Context, target *api.Target) (*api.ConfirmResponse, error) {
-	return sclient.Client.SelectDemand(ctx, target)
+	return sclient.SXClient.Client.SelectDemand(ctx, target)
 }
 
 func (p proxyInfo) Confirm(ctx context.Context, target *api.Target) (*api.Response, error) {
-	return sclient.Client.Confirm(ctx, target)
+	return sclient.SXClient.Client.Confirm(ctx, target)
 }
 
 func removeDemandChannelFromSlice(sl []chan *api.Demand, c chan *api.Demand) []chan *api.Demand {
@@ -98,7 +98,7 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 		demCh := make(chan *api.Demand, MessageChannelBufferSize)
 		demandChs[ch.ChannelType] = append(demandChs[ch.ChannelType], demCh)
 		dmu.Unlock()
-		dmc, err := sclient.Client.SubscribeDemand(ctx, ch)
+		dmc, err := sclient.SXClient.Client.SubscribeDemand(ctx, ch)
 		if err != nil {
 			log.Printf("SubscribeDemand Error %v", err)
 			dmu.Lock()
@@ -175,7 +175,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
 	smu.Unlock()
 	if len(supplyChs[ch.ChannelType]) == 1 { // if there is no subscriber.
-		spc, err := sclient.Client.SubscribeSupply(ctx, ch)
+		spc, err := sclient.SXClient.Client.SubscribeSupply(ctx, ch)
 		if err != nil {
 			log.Printf("SubscribeSupply Error %v", err)
 			smu.Lock()
@@ -250,16 +250,16 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 }
 
 func (p proxyInfo) CreateMbus(ctx context.Context, mbOpt *api.MbusOpt) (*api.Mbus, error) {
-	return sclient.Client.CreateMbus(ctx, mbOpt)
+	return sclient.SXClient.Client.CreateMbus(ctx, mbOpt)
 }
 
 func (p proxyInfo) CloseMbus(ctx context.Context, mb *api.Mbus) (*api.Response, error) {
-	return sclient.Client.CloseMbus(ctx, mb)
+	return sclient.SXClient.Client.CloseMbus(ctx, mb)
 }
 
 func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusServer) error {
 	ctx := context.Background()
-	mbc, err := sclient.Client.SubscribeMbus(ctx, mb)
+	mbc, err := sclient.SXClient.Client.SubscribeMbus(ctx, mb)
 
 	if err != nil {
 		log.Printf("SubscribeMbus Error %v", err)
@@ -289,11 +289,11 @@ func (p proxyInfo) SubscribeMbus(mb *api.Mbus, stream api.Synerex_SubscribeMbusS
 }
 
 func (p proxyInfo) SendMbusMsg(ctx context.Context, mb *api.MbusMsg) (*api.Response, error) {
-	return sclient.Client.SendMbusMsg(ctx, mb)
+	return sclient.SXClient.Client.SendMbusMsg(ctx, mb)
 }
 
 func (p proxyInfo) GetMbusState(ctx context.Context, mb *api.Mbus) (*api.MbusState, error) {
-	return sclient.Client.GetMbusState(ctx, mb)
+	return sclient.SXClient.Client.GetMbusState(ctx, mb)
 }
 
 func (p proxyInfo) SubscribeGateway(*api.GatewayInfo, api.Synerex_SubscribeGatewayServer) error {
@@ -305,7 +305,7 @@ func (p proxyInfo) ForwardToGateway(context.Context, *api.GatewayMsg) (*api.Resp
 }
 
 func (p proxyInfo) CloseDemandChannel(ctx context.Context, ch *api.Channel) (*api.Response, error) {
-	return sclient.Client.CloseDemandChannel(ctx, ch)
+	return sclient.SXClient.Client.CloseDemandChannel(ctx, ch)
 }
 
 func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*api.Response, error) {
@@ -320,13 +320,13 @@ func (p proxyInfo) CloseSupplyChannel(ctx context.Context, ch *api.Channel) (*ap
 	smu.Unlock()
 	//	return &api.Response{Ok: true, Err: ""}, nil
 	ch.ClientId = uint64(sclient.ClientID)
-	return sclient.Client.CloseSupplyChannel(ctx, ch)
+	return sclient.SXClient.Client.CloseSupplyChannel(ctx, ch)
 }
 
 func (p proxyInfo) CloseAllChannels(ctx context.Context, id *api.ProviderID) (*api.Response, error) {
 	// special treatment for Proxy. We do not need to disconnect with server.
 
-	return sclient.Client.CloseAllChannels(ctx, id)
+	return sclient.SXClient.Client.CloseAllChannels(ctx, id)
 }
 
 func newProxyInfo() *proxyInfo {
