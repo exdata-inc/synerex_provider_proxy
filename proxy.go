@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/golang/protobuf/ptypes"
 	api "github.com/synerex/synerex_api"
 	nodeapi "github.com/synerex/synerex_nodeapi"
 	proto "github.com/synerex/synerex_proto"
@@ -42,10 +43,16 @@ type proxyInfo struct {
 }
 
 func (p proxyInfo) NotifyDemand(ctx context.Context, dm *api.Demand) (*api.Response, error) {
+	if dm.Ts == nil {
+		dm.Ts = ptypes.TimestampNow() // add timestamp
+	}
 	return sclient.SXClient.Client.NotifyDemand(ctx, dm)
 }
 
 func (p proxyInfo) NotifySupply(ctx context.Context, sp *api.Supply) (*api.Response, error) {
+	if sp.Ts == nil {
+		sp.Ts = ptypes.TimestampNow() // add timestamp
+	}
 	return sclient.SXClient.Client.NotifySupply(ctx, sp)
 }
 
@@ -352,10 +359,15 @@ func StreamServerInterceptor(srv interface{}, stream grpc.ServerStream, info *gr
 func prepareGrpcServer(pi *proxyInfo, opts ...grpc.ServerOption) *grpc.Server {
 	// we'd like to log the connection
 
-	uIntOpt := grpc.UnaryInterceptor(UnaryServerInterceptor)
-	sIntOpt := grpc.StreamInterceptor(StreamServerInterceptor)
+	var server *grpc.Server
+	if *verbose {
+		uIntOpt := grpc.UnaryInterceptor(UnaryServerInterceptor)
+		sIntOpt := grpc.StreamInterceptor(StreamServerInterceptor)
+		server = grpc.NewServer(uIntOpt, sIntOpt)
+	} else {
+		server = grpc.NewServer()
+	}
 
-	server := grpc.NewServer(uIntOpt, sIntOpt)
 	api.RegisterSynerexServer(server, pi)
 	return server
 }
