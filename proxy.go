@@ -177,12 +177,12 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 	ctx := context.Background()
 	ch.ClientId = uint64(sclient.ClientID) // we need to set proper clientID
 
-	smu.Lock()
-	supCh := make(chan *api.Supply, MessageChannelBufferSize)
-	supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
-	smu.Unlock()
-	if len(supplyChs[ch.ChannelType]) == 1 { // if there is no subscriber.
-		spc, err := sclient.SXClient.Client.SubscribeSupply(ctx, ch)
+	if len(supplyChs[ch.ChannelType]) == 0 { // if there is no subscriber.
+		smu.Lock()
+		supCh := make(chan *api.Supply, MessageChannelBufferSize)
+		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
+		smu.Unlock()
+		spc, err := sclient.SXClient.Client.SubscribeSupply(ctx, ch) // this should be called once.
 		if err != nil {
 			log.Printf("SubscribeSupply Error %v", err)
 			smu.Lock()
@@ -213,9 +213,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 					err = stream.Send(sp)
 					if err != nil {
 						log.Printf("Send Supply Error %v", err)
-						smu.Lock()
 						supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
-						smu.Unlock()
 					}
 				} else {
 					chans[i] <- sp
@@ -224,13 +222,26 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			smu.Unlock()
 			if len(chans) == 0 { // if there is no receiver quit subscirption.
 				// we need to send "No subcriber to server"
+				log.Printf("zero subscribe supply on %d, %v", ch.ChannelType, chans)
 				err = spc.CloseSend()
+				log.Printf("Check closed!to  %v, err:%v",spc,err)
+				// currently this is not working.. umm.
+				// we may restart all.
+				ctx2 := context.Background()
+				respoc, err2 := sclient.SXClient.Client.CloseSupplyChannel(ctx2,ch)		
+				log.Printf("CloseSupplyChannel  %v , %v",respoc,err2)
+
 				break
 			}
 		}
 		log.Printf("SubscribeSupply main closed: %v", ch)
 		return err
 	} else {
+		smu.Lock()
+		supCh := make(chan *api.Supply, MessageChannelBufferSize)
+		supplyChs[ch.ChannelType] = append(supplyChs[ch.ChannelType], supCh)
+		smu.Unlock()
+
 		num := len(supplyChs[ch.ChannelType])
 		log.Printf("No %d SubscribeSupply OK %v", num, ch)
 		var err error = nil
