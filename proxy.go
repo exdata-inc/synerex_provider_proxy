@@ -148,6 +148,11 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 			if len(chans) == 0 { // if there is no receiver quit subscirption.
 				// we need to send "No subcriber to server"
 				err = dmc.CloseSend()
+
+				ctx2 := context.Background()
+				respoc, err2 := sclient.SXClient.Client.CloseDemandChannel(ctx2,ch)		
+				log.Printf("CloseDemandChannel  %v , %v",respoc,err2)
+
 				break
 			}
 		}
@@ -225,8 +230,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 				log.Printf("zero subscribe supply on %d, %v", ch.ChannelType, chans)
 				err = spc.CloseSend()
 				log.Printf("Check closed!to  %v, err:%v",spc,err)
-				// currently this is not working.. umm.
-				// we may restart all.
+				// should close all channel
 				ctx2 := context.Background()
 				respoc, err2 := sclient.SXClient.Client.CloseSupplyChannel(ctx2,ch)		
 				log.Printf("CloseSupplyChannel  %v , %v",respoc,err2)
