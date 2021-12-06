@@ -208,7 +208,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			smu.Unlock()
 			return err
 		} else {
-			log.Printf("SubscribeSupply OK %v", ch)
+			log.Printf("0SubscribeSupply OK %v", ch)
 		}
 		for {
 			var sp *api.Supply
@@ -223,7 +223,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			}
 			if *verbose {
 				//				log.Printf("Supply:%d:%v", ch.ChannelType, sp)
-				log.Printf("Sup-ch%d:%s,ID %d,Sender %d,Target %d,len %d", ch.ChannelType, sp.SupplyName, sp.Id, sp.SenderId, sp.TargetId, len(sp.Cdata.Entity))
+				log.Printf("Sup-ch%d:%s,ID %d,Sender %d,Target %d", ch.ChannelType, sp.SupplyName, sp.Id, sp.SenderId, sp.TargetId) // , len(sp.Cdata.Entity))
 
 			}
 			smu.Lock()
