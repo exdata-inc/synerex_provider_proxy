@@ -68,6 +68,10 @@ func (p proxyInfo) SelectSupply(ctx context.Context, target *api.Target) (*api.C
 	return sclient.SXClient.Client.SelectSupply(ctx, target)
 }
 
+func (p proxyInfo) SelectModifiedSupply(ctx context.Context, sp *api.Supply) (*api.ConfirmResponse, error) {
+	return sclient.SXClient.Client.SelectModifiedSupply(ctx, sp)
+}
+
 func (p proxyInfo) SelectDemand(ctx context.Context, target *api.Target) (*api.ConfirmResponse, error) {
 	return sclient.SXClient.Client.SelectDemand(ctx, target)
 }
@@ -87,8 +91,16 @@ func removeDemandChannelFromSlice(sl []chan *api.Demand, c chan *api.Demand) []c
 }
 
 func removeSupplyChannelFromSlice(sl []chan *api.Supply, c chan *api.Supply) []chan *api.Supply {
+	log.Printf("remove %#v %#v", sl, c)
 	for i, ch := range sl {
 		if ch == c {
+			log.Printf("remove %d, %d", len(sl), i)
+			if i == 0 && len(sl) == 1 {
+				return []chan *api.Supply{}
+			}
+			if i+1 == len(sl) {
+				return sl[:i]
+			}
 			return append(sl[:i], sl[i+1:]...)
 		}
 	}
@@ -127,7 +139,8 @@ func (p proxyInfo) SubscribeDemand(ch *api.Channel, stream api.Synerex_Subscribe
 				break
 			}
 			if *verbose {
-				log.Printf("Demand:%d:%v", ch.ChannelType, dm)
+				//	log.Printf("Demand:%d:%v", ch.ChannelType, dm)
+				log.Printf("Dmd-ch%d:%s,ID %d,Sender %d,Target %d,len %d", ch.ChannelType, dm.DemandName, dm.Id, dm.SenderId, dm.TargetId, len(dm.Cdata.Entity))
 			}
 			dmu.Lock()
 			chans := demandChs[ch.ChannelType]
@@ -204,7 +217,9 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 				break
 			}
 			if *verbose {
-				log.Printf("Supply:%d:%v", ch.ChannelType, sp)
+				//				log.Printf("Supply:%d:%v", ch.ChannelType, sp)
+				log.Printf("Sup-ch%d:%s,ID %d,Sender %d,Target %d,len %d", ch.ChannelType, sp.SupplyName, sp.Id, sp.SenderId, sp.TargetId, len(sp.Cdata.Entity))
+
 			}
 			smu.Lock()
 			chans := supplyChs[ch.ChannelType]
@@ -212,10 +227,14 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 				if chans[i] == supCh {
 					err = stream.Send(sp)
 					if err != nil {
-						log.Printf("Send Supply Error %v", err)
-						smu.Lock()
+						log.Printf("Send Supply Error i %d sup %v ", i, err)
+						//						log.Printf("chTypes %#v", supplyChs[ch.ChannelType])
 						supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
-						smu.Unlock()
+						//						log.Printf("sp is %#v", sp)
+						log.Printf("ErrSup-ch%d:%s,ID %d,Sender %d,Target %d", ch.ChannelType, sp.SupplyName, sp.Id, sp.SenderId, sp.TargetId)
+						if sp.Cdata != nil {
+							log.Printf("%#v", sp.Cdata.Entity)
+						}
 					}
 				} else {
 					chans[i] <- sp
@@ -224,6 +243,7 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			smu.Unlock()
 			if len(chans) == 0 { // if there is no receiver quit subscirption.
 				// we need to send "No subcriber to server"
+				log.Printf("No Subscriber to server")
 				err = spc.CloseSend()
 				break
 			}
@@ -239,9 +259,11 @@ func (p proxyInfo) SubscribeSupply(ch *api.Channel, stream api.Synerex_Subscribe
 			if sp != nil {
 				err = stream.Send(sp)
 				if err != nil {
-					log.Printf("Send Supply Error %v", err)
+					//					log.Printf("Send Supply Error No %d, %v", num, err)
 					smu.Lock()
 					supplyChs[ch.ChannelType] = removeSupplyChannelFromSlice(supplyChs[ch.ChannelType], supCh)
+					//					log.Printf("ErrSup-ch%d:%s,ID %d,Sender %d,Target %d,len %d", ch.ChannelType, sp.SupplyName, sp.Id, sp.SenderId, sp.TargetId, len(sp.Cdata.Entity))
+					//					log.Printf("%v", sp.Cdata.Entity)
 					smu.Unlock()
 					break
 				}
