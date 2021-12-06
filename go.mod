@@ -3,11 +3,8 @@ module proxy
 go 1.16
 
 require (
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/protobuf v1.5.2
-	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.21.11 // indirect
 	github.com/synerex/synerex_api v0.5.1
 	github.com/synerex/synerex_nodeapi v0.5.6
